@@ -229,9 +229,9 @@ This project is open source and available under the [MIT License](LICENSE).
 ## 🤝 Contact
 
 **Mohan Prasath**
-- Email: hello@mohanprasath.dev
+- Email: mohanprasath210607@gmail.com
 - GitHub: [github.com/mohanprasath-dev](https://github.com/mohanprasath-dev)
-- LinkedIn: [linkedin.com/in/mohanprasath](https://linkedin.com/in/mohanprasath)
+- LinkedIn: [linkedin.com/in/mohanprasath21](https://linkedin.com/in/mohanprasath21)
 
 ---
 
