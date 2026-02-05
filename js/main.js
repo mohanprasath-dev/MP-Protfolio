@@ -248,6 +248,7 @@ function initNavigation() {
     const navToggle = document.getElementById('nav-toggle');
     const navMenu = document.getElementById('nav-menu');
     const navLinks = document.querySelectorAll('.nav-link');
+    const navActions = document.querySelector('.nav-actions');
     
     // Header scroll effect
     ScrollTrigger.create({
@@ -265,6 +266,7 @@ function initNavigation() {
     navToggle.addEventListener('click', () => {
         navToggle.classList.toggle('active');
         navMenu.classList.toggle('active');
+        document.body.style.overflow = navMenu.classList.contains('active') ? 'hidden' : '';
         
         // Animate menu items
         if (navMenu.classList.contains('active')) {
@@ -279,6 +281,20 @@ function initNavigation() {
                     delay: 0.2
                 }
             );
+            
+            // Animate action buttons on mobile
+            if (window.innerWidth <= 900 && navActions) {
+                gsap.fromTo(navActions, 
+                    { y: 30, opacity: 0 },
+                    { 
+                        y: 0, 
+                        opacity: 1, 
+                        duration: 0.5, 
+                        ease: 'power3.out',
+                        delay: 0.6
+                    }
+                );
+            }
         }
     });
     
@@ -287,6 +303,19 @@ function initNavigation() {
         link.addEventListener('click', () => {
             navToggle.classList.remove('active');
             navMenu.classList.remove('active');
+            document.body.style.overflow = '';
+        });
+    });
+    
+    // Close mobile menu on action button click
+    const actionButtons = document.querySelectorAll('.nav-btn');
+    actionButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (navMenu.classList.contains('active')) {
+                navToggle.classList.remove('active');
+                navMenu.classList.remove('active');
+                document.body.style.overflow = '';
+            }
         });
     });
     
@@ -575,6 +604,8 @@ function initScrollAnimations() {
 // Converts vertical scroll to horizontal movement
 // ============================================
 
+let horizontalScrollTrigger = null;
+
 function initHorizontalScroll() {
     const projectsSection = document.getElementById('projects');
     const projectsWrapper = document.getElementById('projects-wrapper');
@@ -593,27 +624,47 @@ function initHorizontalScroll() {
         counterTotal.textContent = String(projectCards.length).padStart(2, '0');
     }
     
+    // Check if we should enable horizontal scroll (only on larger screens)
+    const isLargeScreen = () => window.innerWidth > 768;
+    
     // Calculate the total scroll distance needed
     const getScrollDistance = () => {
         const trackWidth = projectsTrack.scrollWidth;
         const viewportWidth = window.innerWidth;
-        return trackWidth - viewportWidth + 200;
+        return Math.max(0, trackWidth - viewportWidth + 200);
     };
     
     // Set section height based on scroll distance
     const setSectionHeight = () => {
+        if (!isLargeScreen()) {
+            projectsSection.style.height = 'auto';
+            return;
+        }
         const scrollDistance = getScrollDistance();
         const sectionHeight = window.innerHeight + scrollDistance;
         projectsSection.style.height = `${sectionHeight}px`;
     };
     
-    setSectionHeight();
-    
-    // Horizontal scroll animation with GSAP ScrollTrigger
-    gsap.to(projectsTrack, {
-        x: () => -getScrollDistance(),
-        ease: 'none',
-        scrollTrigger: {
+    // Initialize or cleanup horizontal scroll based on screen size
+    const setupHorizontalScroll = () => {
+        // Kill existing ScrollTrigger if any
+        if (horizontalScrollTrigger) {
+            horizontalScrollTrigger.kill();
+            horizontalScrollTrigger = null;
+            gsap.set(projectsTrack, { x: 0 });
+        }
+        
+        if (!isLargeScreen()) {
+            projectsSection.style.height = 'auto';
+            if (progressContainer) progressContainer.classList.remove('active');
+            if (counterContainer) counterContainer.classList.remove('active');
+            return;
+        }
+        
+        setSectionHeight();
+        
+        // Create horizontal scroll animation with GSAP ScrollTrigger
+        horizontalScrollTrigger = ScrollTrigger.create({
             trigger: projectsSection,
             start: 'top top',
             end: () => `+=${getScrollDistance()}`,
@@ -639,6 +690,9 @@ function initHorizontalScroll() {
                 if (counterContainer) counterContainer.classList.remove('active');
             },
             onUpdate: (self) => {
+                // Move the track horizontally
+                gsap.set(projectsTrack, { x: -getScrollDistance() * self.progress });
+                
                 // Update progress bar
                 if (progressBar) {
                     progressBar.style.width = `${self.progress * 100}%`;
@@ -653,36 +707,40 @@ function initHorizontalScroll() {
                     counterCurrent.textContent = String(currentIndex).padStart(2, '0');
                 }
             }
-        }
-    });
+        });
+    };
     
-    // Parallax effect on project images
-    projectCards.forEach((card, index) => {
-        const visual = card.querySelector('.project-visual');
-        const image = card.querySelector('.project-image');
-        
-        if (image) {
-            gsap.to(image, {
-                scrollTrigger: {
-                    trigger: projectsSection,
-                    start: 'top top',
-                    end: () => `+=${getScrollDistance()}`,
-                    scrub: 1
-                },
-                x: -50 * (index + 1) * 0.3,
-                ease: 'none'
-            });
-        }
-    });
+    // Initialize horizontal scroll
+    setupHorizontalScroll();
     
-    // Recalculate on resize
+    // Parallax effect on project images (only on large screens)
+    if (isLargeScreen()) {
+        projectCards.forEach((card, index) => {
+            const image = card.querySelector('.project-image');
+            
+            if (image) {
+                gsap.to(image, {
+                    scrollTrigger: {
+                        trigger: projectsSection,
+                        start: 'top top',
+                        end: () => `+=${getScrollDistance()}`,
+                        scrub: 1
+                    },
+                    x: -50 * (index + 1) * 0.3,
+                    ease: 'none'
+                });
+            }
+        });
+    }
+    
+    // Recalculate on resize with debounce
     let resizeTimeout;
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => {
-            setSectionHeight();
+            setupHorizontalScroll();
             ScrollTrigger.refresh();
-        }, 200);
+        }, 250);
     });
 }
 
