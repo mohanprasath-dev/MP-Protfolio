@@ -35,11 +35,13 @@ document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initHeroAnimations();
     initScrollAnimations();
-    initHorizontalScroll(); // New horizontal scroll for projects
+    initHorizontalScroll();
     initParallax();
     initCounters();
     initContactForm();
     initFooter();
+    initVideoExpand();
+    initProjectCardClick();
 });
 
 // ============================================
@@ -127,7 +129,7 @@ function initLenisScroll() {
         direction: 'vertical',   // Scroll direction
         gestureDirection: 'vertical',
         smooth: true,            // Enable smooth scroll
-        smoothTouch: false,      // Disable on touch devices
+        smoothTouch: true,       // Enable on touch devices for horizontal scroll
         touchMultiplier: 2,      // Touch sensitivity
     });
     
@@ -239,8 +241,8 @@ function initCustomCursor() {
 }
 
 // ============================================
-// NAVIGATION
-// Header scroll effects and mobile menu
+// NAVIGATION — Dynamic Island
+// Scroll-driven show/hide, mobile morph, outside click
 // ============================================
 
 function initNavigation() {
@@ -249,96 +251,133 @@ function initNavigation() {
     const navMenu = document.getElementById('nav-menu');
     const navLinks = document.querySelectorAll('.nav-link');
     const navActions = document.querySelector('.nav-actions');
-    
-    // Header scroll effect
-    ScrollTrigger.create({
-        start: 'top -80',
-        onUpdate: (self) => {
-            if (self.direction === 1) {
-                header.classList.add('scrolled');
-            } else if (self.progress === 0) {
-                header.classList.remove('scrolled');
-            }
+
+    if (!header) return;
+
+    // --- Scroll show/hide ---
+    let lastScrollY = 0;
+    let scrollTicking = false;
+
+    const handleScroll = () => {
+        const currentY = window.scrollY;
+        if (currentY > 120 && currentY > lastScrollY) {
+            header.classList.add('hidden');
+        } else {
+            header.classList.remove('hidden');
         }
-    });
-    
-    // Mobile menu toggle
-    navToggle.addEventListener('click', () => {
-        navToggle.classList.toggle('active');
-        navMenu.classList.toggle('active');
-        document.body.style.overflow = navMenu.classList.contains('active') ? 'hidden' : '';
-        
-        // Animate menu items
-        if (navMenu.classList.contains('active')) {
-            gsap.fromTo(navLinks, 
-                { y: 50, opacity: 0 },
-                { 
-                    y: 0, 
-                    opacity: 1, 
-                    duration: 0.5, 
-                    stagger: 0.1, 
+        lastScrollY = currentY;
+        scrollTicking = false;
+    };
+
+    window.addEventListener('scroll', () => {
+        if (!scrollTicking) {
+            requestAnimationFrame(handleScroll);
+            scrollTicking = true;
+        }
+    }, { passive: true });
+
+    // --- Mobile toggle ---
+    function openMenu() {
+        navToggle.classList.add('active');
+        navToggle.setAttribute('aria-expanded', 'true');
+        navMenu.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        if (lenis) lenis.stop();
+
+        // Animate menu items in
+        gsap.fromTo(navLinks,
+            { y: 50, opacity: 0 },
+            {
+                y: 0,
+                opacity: 1,
+                duration: 0.5,
+                stagger: 0.1,
+                ease: 'power3.out',
+                delay: 0.2
+            }
+        );
+
+        if (window.innerWidth <= 900 && navActions) {
+            gsap.fromTo(navActions,
+                { y: 30, opacity: 0 },
+                {
+                    y: 0,
+                    opacity: 1,
+                    duration: 0.5,
                     ease: 'power3.out',
-                    delay: 0.2
+                    delay: 0.6
                 }
             );
-            
-            // Animate action buttons on mobile
-            if (window.innerWidth <= 900 && navActions) {
-                gsap.fromTo(navActions, 
-                    { y: 30, opacity: 0 },
-                    { 
-                        y: 0, 
-                        opacity: 1, 
-                        duration: 0.5, 
-                        ease: 'power3.out',
-                        delay: 0.6
-                    }
-                );
+        }
+    }
+
+    function closeMenu() {
+        navToggle.classList.remove('active');
+        navToggle.setAttribute('aria-expanded', 'false');
+        navMenu.classList.remove('active');
+        document.body.style.overflow = '';
+        if (lenis) lenis.start();
+    }
+
+    if (navToggle && navMenu) {
+        navToggle.addEventListener('click', () => {
+            if (navMenu.classList.contains('active')) {
+                closeMenu();
+            } else {
+                openMenu();
+            }
+        });
+    }
+
+    // Close on link click
+    navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            if (navMenu.classList.contains('active')) closeMenu();
+        });
+    });
+
+    // Close on action button click
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (navMenu && navMenu.classList.contains('active')) closeMenu();
+        });
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+        if (navMenu && navMenu.classList.contains('active')) {
+            if (!navMenu.contains(e.target) && !navToggle.contains(e.target)) {
+                closeMenu();
             }
         }
     });
-    
-    // Close mobile menu on link click
-    navLinks.forEach(link => {
-        link.addEventListener('click', () => {
-            navToggle.classList.remove('active');
-            navMenu.classList.remove('active');
-            document.body.style.overflow = '';
-        });
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && navMenu && navMenu.classList.contains('active')) {
+            closeMenu();
+            navToggle.focus();
+        }
     });
-    
-    // Close mobile menu on action button click
-    const actionButtons = document.querySelectorAll('.nav-btn');
-    actionButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (navMenu.classList.contains('active')) {
-                navToggle.classList.remove('active');
-                navMenu.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-        });
-    });
-    
-    // Active section highlighting (scroll spy)
+
+    // --- Scroll spy for active section ---
     const sections = document.querySelectorAll('section[id]');
-    
+
     function updateActiveNav() {
         const scrollPos = window.scrollY + 200;
-        
         sections.forEach(section => {
             const sectionTop = section.offsetTop;
             const sectionHeight = section.offsetHeight;
             const sectionId = section.getAttribute('id');
             const navLink = document.querySelector(`.nav-link[href="#${sectionId}"]`);
-            
             if (navLink && scrollPos >= sectionTop && scrollPos < sectionTop + sectionHeight) {
-                navLinks.forEach(link => link.classList.remove('active'));
+                navLinks.forEach(l => l.classList.remove('active'));
                 navLink.classList.add('active');
             }
         });
     }
-    
-    window.addEventListener('scroll', updateActiveNav);
+
+    window.addEventListener('scroll', updateActiveNav, { passive: true });
     updateActiveNav();
 }
 
@@ -624,9 +663,6 @@ function initHorizontalScroll() {
         counterTotal.textContent = String(projectCards.length).padStart(2, '0');
     }
     
-    // Check if we should enable horizontal scroll (only on larger screens)
-    const isLargeScreen = () => window.innerWidth > 768;
-    
     // Calculate the total scroll distance needed
     const getScrollDistance = () => {
         const trackWidth = projectsTrack.scrollWidth;
@@ -636,29 +672,18 @@ function initHorizontalScroll() {
     
     // Set section height based on scroll distance
     const setSectionHeight = () => {
-        if (!isLargeScreen()) {
-            projectsSection.style.height = 'auto';
-            return;
-        }
         const scrollDistance = getScrollDistance();
         const sectionHeight = window.innerHeight + scrollDistance;
         projectsSection.style.height = `${sectionHeight}px`;
     };
     
-    // Initialize or cleanup horizontal scroll based on screen size
+    // Initialize or cleanup horizontal scroll
     const setupHorizontalScroll = () => {
         // Kill existing ScrollTrigger if any
         if (horizontalScrollTrigger) {
             horizontalScrollTrigger.kill();
             horizontalScrollTrigger = null;
             gsap.set(projectsTrack, { x: 0 });
-        }
-        
-        if (!isLargeScreen()) {
-            projectsSection.style.height = 'auto';
-            if (progressContainer) progressContainer.classList.remove('active');
-            if (counterContainer) counterContainer.classList.remove('active');
-            return;
         }
         
         setSectionHeight();
@@ -712,26 +737,24 @@ function initHorizontalScroll() {
     
     // Initialize horizontal scroll
     setupHorizontalScroll();
-    
-    // Parallax effect on project images (only on large screens)
-    if (isLargeScreen()) {
-        projectCards.forEach((card, index) => {
-            const image = card.querySelector('.project-image');
-            
-            if (image) {
-                gsap.to(image, {
-                    scrollTrigger: {
-                        trigger: projectsSection,
-                        start: 'top top',
-                        end: () => `+=${getScrollDistance()}`,
-                        scrub: 1
-                    },
-                    x: -50 * (index + 1) * 0.3,
-                    ease: 'none'
-                });
-            }
-        });
-    }
+
+    // Parallax effect on project videos
+    projectCards.forEach((card, index) => {
+        const video = card.querySelector('.project-video');
+        
+        if (video) {
+            gsap.to(video, {
+                scrollTrigger: {
+                    trigger: projectsSection,
+                    start: 'top top',
+                    end: () => `+=${getScrollDistance()}`,
+                    scrub: 1
+                },
+                x: -50 * (index + 1) * 0.3,
+                ease: 'none'
+            });
+        }
+    });
     
     // Recalculate on resize with debounce
     let resizeTimeout;
@@ -888,6 +911,114 @@ function initContactForm() {
 }
 
 // ============================================
+// PROJECT CARD CLICK BEHAVIOR
+// Full-card clickable, keyboard accessible
+// ============================================
+
+function initProjectCardClick() {
+    const cards = document.querySelectorAll('.project-card-horizontal');
+
+    cards.forEach(card => {
+        // Get the primary action link (first .project-action-btn)
+        const primaryLink = card.querySelector('.project-action-btn');
+        if (!primaryLink) return;
+
+        const href = primaryLink.getAttribute('href');
+        if (!href) return;
+
+        // Make card focusable and annotate
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('role', 'link');
+        card.setAttribute('aria-label', card.querySelector('.project-title-h')?.textContent || 'View project');
+
+        // Click handler — navigate unless clicking nested interactive elements
+        card.addEventListener('click', (e) => {
+            const target = e.target;
+            // Don't intercept clicks on links, buttons, or expand buttons
+            if (target.closest('a') || target.closest('button') || target.closest('.project-expand-btn')) {
+                return;
+            }
+            window.open(href, '_blank', 'noopener');
+        });
+
+        // Keyboard accessibility — Enter or Space to navigate
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                window.open(href, '_blank', 'noopener');
+            }
+        });
+    });
+}
+
+// ============================================
+// VIDEO FULLSCREEN EXPAND
+// Clicking expand button opens video in fullscreen overlay
+// ============================================
+
+function initVideoExpand() {
+    const overlay = document.getElementById('video-fullscreen-overlay');
+    const fullscreenVideo = document.getElementById('fullscreen-video');
+    const closeBtn = document.getElementById('video-fullscreen-close');
+
+    if (!overlay || !fullscreenVideo) return;
+
+    let sourceVideo = null;
+
+    // Attach expand button click handlers
+    document.querySelectorAll('.project-expand-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const wrapper = btn.closest('.project-media-wrapper');
+            if (!wrapper) return;
+            sourceVideo = wrapper.querySelector('.project-video');
+            if (!sourceVideo) return;
+
+            fullscreenVideo.src = sourceVideo.currentSrc || sourceVideo.src;
+            fullscreenVideo.poster = sourceVideo.poster || '';
+            fullscreenVideo.currentTime = sourceVideo.currentTime;
+            fullscreenVideo.play().catch(() => {});
+
+            overlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            if (lenis) lenis.stop();
+        });
+    });
+
+    function closeOverlay() {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+        if (lenis) lenis.start();
+        fullscreenVideo.pause();
+        fullscreenVideo.removeAttribute('src');
+        fullscreenVideo.load();
+        sourceVideo = null;
+    }
+
+    // Close on button click
+    if (closeBtn) {
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeOverlay();
+        });
+    }
+
+    // Close on overlay background click
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            closeOverlay();
+        }
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay.classList.contains('active')) {
+            closeOverlay();
+        }
+    });
+}
+
+// ============================================
 // FOOTER
 // Footer interactions
 // ============================================
@@ -917,7 +1048,7 @@ function initFooter() {
 // ============================================
 
 function initMagneticButtons() {
-    const magneticElements = document.querySelectorAll('.btn, .project-link, .social-link');
+    const magneticElements = document.querySelectorAll('.btn, .social-link');
     
     magneticElements.forEach(el => {
         el.addEventListener('mousemove', (e) => {
@@ -1000,31 +1131,12 @@ prefersReducedMotion.addEventListener('change', (e) => {
 });
 
 // ============================================
-// TEXT SPLITTING UTILITY
-// For letter-by-letter animations
-// ============================================
-
-function splitText(element) {
-    const text = element.textContent;
-    element.textContent = '';
-    
-    return text.split('').map(char => {
-        const span = document.createElement('span');
-        span.className = 'char';
-        span.style.display = 'inline-block';
-        span.textContent = char === ' ' ? '\u00A0' : char;
-        element.appendChild(span);
-        return span;
-    });
-}
-
-// ============================================
 // HOVER TILT EFFECT
 // Cards tilt slightly on hover
 // ============================================
 
 function initTiltEffect() {
-    const tiltElements = document.querySelectorAll('.project-card, .stat-card');
+    const tiltElements = document.querySelectorAll('.stat-card');
     
     tiltElements.forEach(el => {
         el.addEventListener('mousemove', (e) => {
@@ -1059,60 +1171,4 @@ function initTiltEffect() {
 // Initialize tilt effect after load
 window.addEventListener('load', initTiltEffect);
 
-// ============================================
-// INTERSECTION OBSERVER FALLBACK
-// For browsers without ScrollTrigger support
-// ============================================
-
-function initIntersectionObserver() {
-    if (typeof ScrollTrigger === 'undefined') {
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
-                }
-            });
-        }, { threshold: 0.1 });
-        
-        document.querySelectorAll('.reveal-text, .section-header, .stat-card, .skill-item, .project-card, .timeline-item').forEach(el => {
-            observer.observe(el);
-        });
-    }
-}
-
-// ============================================
-// KEYBOARD NAVIGATION
-// Enhanced keyboard accessibility
-// ============================================
-
-document.addEventListener('keydown', (e) => {
-    // Close mobile menu on Escape
-    if (e.key === 'Escape') {
-        const navToggle = document.getElementById('nav-toggle');
-        const navMenu = document.getElementById('nav-menu');
-        
-        if (navMenu && navMenu.classList.contains('active')) {
-            navToggle.classList.remove('active');
-            navMenu.classList.remove('active');
-        }
-    }
-});
-
-// ============================================
-// CONSOLE EASTER EGG
-// ============================================
-
-console.log(`
-%c🚀 Mohan Prasath's Portfolio
-
-%cBuilt with passion and precision.
-Technologies: HTML5, CSS3, JavaScript, GSAP, Lenis
-
-%cLooking to collaborate? Let's connect!
-
-`, 
-'font-size: 24px; font-weight: bold;',
-'font-size: 14px; color: #888;',
-'font-size: 12px; color: #666;'
-);
+// Keyboard nav for Escape is handled inside initNavigation()
