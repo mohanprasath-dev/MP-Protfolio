@@ -281,31 +281,29 @@ function initNavigation() {
         navToggle.classList.add('active');
         navToggle.setAttribute('aria-expanded', 'true');
         navMenu.classList.add('active');
-        document.body.style.overflow = 'hidden';
-        if (lenis) lenis.stop();
 
         // Animate menu items in
         gsap.fromTo(navLinks,
-            { y: 50, opacity: 0 },
+            { y: 15, opacity: 0 },
             {
                 y: 0,
                 opacity: 1,
-                duration: 0.5,
-                stagger: 0.1,
+                duration: 0.35,
+                stagger: 0.06,
                 ease: 'power3.out',
-                delay: 0.2
+                delay: 0.1
             }
         );
 
         if (window.innerWidth <= 900 && navActions) {
             gsap.fromTo(navActions,
-                { y: 30, opacity: 0 },
+                { y: 10, opacity: 0 },
                 {
                     y: 0,
                     opacity: 1,
-                    duration: 0.5,
+                    duration: 0.35,
                     ease: 'power3.out',
-                    delay: 0.6
+                    delay: 0.3
                 }
             );
         }
@@ -315,8 +313,6 @@ function initNavigation() {
         navToggle.classList.remove('active');
         navToggle.setAttribute('aria-expanded', 'false');
         navMenu.classList.remove('active');
-        document.body.style.overflow = '';
-        if (lenis) lenis.start();
     }
 
     if (navToggle && navMenu) {
@@ -934,8 +930,8 @@ function initProjectCardClick() {
         // Click handler — navigate unless clicking nested interactive elements
         card.addEventListener('click', (e) => {
             const target = e.target;
-            // Don't intercept clicks on links, buttons, or expand buttons
-            if (target.closest('a') || target.closest('button') || target.closest('.project-expand-btn')) {
+            // Don't intercept clicks on links or buttons
+            if (target.closest('a') || target.closest('button')) {
                 return;
             }
             window.open(href, '_blank', 'noopener');
@@ -952,69 +948,34 @@ function initProjectCardClick() {
 }
 
 // ============================================
-// VIDEO FULLSCREEN EXPAND
-// Clicking expand button opens video in fullscreen overlay
+// VIDEO HOVER EXPAND
+// Desktop-only: video scales up on hover via CSS class
+// Disabled on touch devices, handles rapid hover switching
 // ============================================
 
 function initVideoExpand() {
-    const overlay = document.getElementById('video-fullscreen-overlay');
-    const fullscreenVideo = document.getElementById('fullscreen-video');
-    const closeBtn = document.getElementById('video-fullscreen-close');
+    // Skip on touch devices
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) return;
 
-    if (!overlay || !fullscreenVideo) return;
+    const wrappers = document.querySelectorAll('.project-media-wrapper');
+    if (!wrappers.length) return;
 
-    let sourceVideo = null;
+    let activeWrapper = null;
 
-    // Attach expand button click handlers
-    document.querySelectorAll('.project-expand-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const wrapper = btn.closest('.project-media-wrapper');
-            if (!wrapper) return;
-            sourceVideo = wrapper.querySelector('.project-video');
-            if (!sourceVideo) return;
-
-            fullscreenVideo.src = sourceVideo.currentSrc || sourceVideo.src;
-            fullscreenVideo.poster = sourceVideo.poster || '';
-            fullscreenVideo.currentTime = sourceVideo.currentTime;
-            fullscreenVideo.play().catch(() => {});
-
-            overlay.classList.add('active');
-            document.body.style.overflow = 'hidden';
-            if (lenis) lenis.stop();
+    wrappers.forEach(wrapper => {
+        wrapper.addEventListener('mouseenter', () => {
+            // Remove from previous if rapidly switching
+            if (activeWrapper && activeWrapper !== wrapper) {
+                activeWrapper.classList.remove('hover-expand');
+            }
+            wrapper.classList.add('hover-expand');
+            activeWrapper = wrapper;
         });
-    });
 
-    function closeOverlay() {
-        overlay.classList.remove('active');
-        document.body.style.overflow = '';
-        if (lenis) lenis.start();
-        fullscreenVideo.pause();
-        fullscreenVideo.removeAttribute('src');
-        fullscreenVideo.load();
-        sourceVideo = null;
-    }
-
-    // Close on button click
-    if (closeBtn) {
-        closeBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            closeOverlay();
+        wrapper.addEventListener('mouseleave', () => {
+            wrapper.classList.remove('hover-expand');
+            if (activeWrapper === wrapper) activeWrapper = null;
         });
-    }
-
-    // Close on overlay background click
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-            closeOverlay();
-        }
-    });
-
-    // Close on Escape
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && overlay.classList.contains('active')) {
-            closeOverlay();
-        }
     });
 }
 
